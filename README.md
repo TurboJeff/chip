@@ -391,6 +391,10 @@ proto/       paths and types shared with the hub
 
 The `tunnel` and `proto` packages contain the protocol between the chip and the hub.
 
+## Security
+
+To report a vulnerability, see [SECURITY.md](SECURITY.md).
+
 ## License
 
 Copyright 2026 Jeff Webb. Licensed under the [Apache License, Version 2.0](LICENSE).
