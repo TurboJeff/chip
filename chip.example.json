@@ -1,5 +1,5 @@
 {
-  "server": "https://chipin.example.com",
+  "server": "https://hub.chipin.dev",
   "token": "chip_paste_token_from_dashboard",
   "resources": [
     {

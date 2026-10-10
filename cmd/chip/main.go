@@ -3,7 +3,7 @@
 //
 // Quick start, sharing a local Ollama:
 //
-//	chip -server https://chipin.example.com -token chip_xxx -upstream http://127.0.0.1:11434/v1
+//	chip -server https://hub.chipin.dev -token chip_xxx -upstream http://127.0.0.1:11434/v1
 //
 // Or with a config file (see chip.example.json):
 //
