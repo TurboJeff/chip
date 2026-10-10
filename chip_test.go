@@ -12,6 +12,7 @@ import (
 	"strings"
 	"sync/atomic"
 	"testing"
+	"time"
 )
 
 // fakeUpstream records what reached the "local AI daemon".
@@ -278,5 +279,30 @@ func TestOnlyAllowlistedHeadersCross(t *testing.T) {
 		if rec.Header().Get(k) != "" {
 			t.Errorf("%s came back from the upstream", k)
 		}
+	}
+}
+
+// A model server that never sends headers gets a 502 and frees the slot
+// (issue #8).
+func TestUpstreamThatNeverAnswersTimesOut(t *testing.T) {
+	old := upstreamHeaderTimeout
+	upstreamHeaderTimeout = 100 * time.Millisecond
+	t.Cleanup(func() { upstreamHeaderTimeout = old })
+
+	hang := make(chan struct{})
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { <-hang }))
+	t.Cleanup(ts.Close)
+	t.Cleanup(func() { close(hang) })
+	a, err := New(&Config{Server: "http://localhost", Token: "t", Resources: []Resource{
+		{Name: "ai", Upstream: ts.URL + "/v1", MaxConcurrent: 1},
+	}}, slog.New(slog.DiscardHandler))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if rec := do(a.Handler(), "POST", "/r/ai/v1/chat/completions", `{"model":"m1"}`, nil); rec.Code != http.StatusBadGateway {
+		t.Fatalf("got %d, want 502", rec.Code)
+	}
+	if n := a.resources["ai"].inflight.Load(); n != 0 {
+		t.Fatalf("slot still held: %d in flight", n)
 	}
 }

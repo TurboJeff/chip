@@ -379,8 +379,14 @@ func upstreamTransport() *http.Transport {
 		IdleConnTimeout:       90 * time.Second,
 		TLSHandshakeTimeout:   10 * time.Second,
 		ExpectContinueTimeout: time.Second,
+		ResponseHeaderTimeout: upstreamHeaderTimeout,
 	}
 }
+
+// upstreamHeaderTimeout frees a slot held by a model server that never
+// answers. It's long because a non-streamed response sends no headers until
+// generation finishes, and loading a large model can take minutes.
+var upstreamHeaderTimeout = 10 * time.Minute
 
 func isLocal(host string) bool {
 	return host == "localhost" || strings.HasPrefix(host, "127.") || host == "::1"
