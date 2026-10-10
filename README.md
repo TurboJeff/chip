@@ -1,6 +1,6 @@
 <div align="center">
 
-<img src=".github/banner.svg" alt="chip" width="640">
+<img src=".github/banner.svg" alt="chipin chip" width="820">
 
 **Share the model server on your machine with the people who need it.**<br>
 No open ports. No exposed address. Your keys stay on your machine.
@@ -16,13 +16,13 @@ No open ports. No exposed address. Your keys stay on your machine.
 
 ---
 
-chip is the agent half of [chipin](https://chipin.dev). You run it next to Ollama, llama.cpp, vLLM, LM Studio or any other OpenAI-compatible server. It dials out to the chipin hub at **hub.chipin.dev** and keeps that connection open. The hub sends requests down it from the teams you share with, and chip passes them to your model server.
+The **chipin chip** is the agent half of [chipin](https://chipin.dev). You run it next to Ollama, llama.cpp, vLLM, LM Studio or any other OpenAI-compatible server. It dials out to the chipin hub at **hub.chipin.dev** and keeps that connection open. The hub sends requests down it from the teams you share with, and the chip passes them to your model server.
 
 ```sh
 chip -server https://hub.chipin.dev -token chip_... -upstream http://127.0.0.1:11434/v1
 ```
 
-That's the whole setup: one static binary with two dependencies, and no config file needed.
+That's the whole setup: one static binary called `chip`, with two dependencies and no config file needed.
 
 ## Contents
 
@@ -50,7 +50,7 @@ flowchart LR
     end
 
     subgraph machine["Your machine"]
-        chip["chip"]
+        chip["chipin chip"]
         model["Model server<br/>Ollama · llama.cpp · vLLM · LM Studio"]
     end
 
@@ -61,14 +61,14 @@ flowchart LR
     chip -- "local HTTP + your upstream key" --> model
 ```
 
-chip makes exactly one connection, and it goes outward. It's a WebSocket to `hub.chipin.dev/tunnel` with [yamux](https://github.com/hashicorp/yamux) running on top. The hub opens a new stream for each request, and chip serves plain HTTP on each stream. One connection carries any number of concurrent requests, and it works behind NAT, home routers and most firewalls.
+The chipin chip makes exactly one connection, and it goes outward. It's a WebSocket to `hub.chipin.dev/tunnel` with [yamux](https://github.com/hashicorp/yamux) running on top. The hub opens a new stream for each request, and chip serves plain HTTP on each stream. One connection carries any number of concurrent requests, and it works behind NAT, home routers and most firewalls.
 
 The full life of a connection:
 
 ```mermaid
 sequenceDiagram
     autonumber
-    participant C as chip
+    participant C as chipin chip
     participant H as chipin hub
     participant M as Model server
 
@@ -235,7 +235,7 @@ Some settings control how your chip is shared, not what it can reach. You set th
 
 ## What chip allows
 
-chip is the boundary between the hub and your machine. It decides what gets through, and the hub can't override it.
+The chipin chip is the boundary between the hub and your machine. It decides what gets through, and the hub can't override it.
 
 - **Four endpoints.** `POST /v1/chat/completions`, `POST /v1/completions`, `POST /v1/embeddings` and `GET /v1/models`. Everything else gets a `404`, including Ollama's `/api/pull` and `/api/delete`.
 - **Your upstreams only.** Requests go to the URLs in your config. The hub picks a resource by name and can't supply an address.
@@ -377,7 +377,7 @@ The Chips page in the dashboard shows each chip's state:
 
 ## Building
 
-chip needs Go 1.26. It builds with CGO off, so the binaries are fully static.
+The chipin chip needs Go 1.26. It builds with CGO off, so the binaries are fully static.
 
 ```sh
 make build    # ./bin/chip for this machine

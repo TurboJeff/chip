@@ -1,5 +1,5 @@
-// Command chip shares local resources (today: OpenAI-compatible AI APIs) with
-// a chipin server over an outbound tunnel.
+// Command chip is the chipin chip. It shares local resources (today:
+// OpenAI-compatible AI APIs) with a chipin server over an outbound tunnel.
 //
 // Quick start, sharing a local Ollama:
 //
@@ -36,7 +36,7 @@ func main() {
 	)
 	flag.Parse()
 	if *version {
-		fmt.Println("chip", proto.Version)
+		fmt.Println("chipin chip", proto.Version)
 		return
 	}
 	log := slog.New(slog.NewTextHandler(os.Stderr, nil))

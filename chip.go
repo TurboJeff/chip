@@ -1,4 +1,5 @@
-// Package chip is the agent that shares local resources with a chipin server.
+// Package chip is the chipin chip: the agent that shares local resources with
+// a chipin server.
 package chip
 
 import (
