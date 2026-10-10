@@ -81,7 +81,7 @@ If the connection drops, the chip waits 1 second and tries again. Each failed at
 ## Quick start
 
 1. Sign in at [hub.chipin.dev](https://hub.chipin.dev), open **Chips**, choose **Add chip** and copy the token. The token is shown only once.
-2. Build the chip. See [Building](#building).
+2. Install the chip. Download the archive for your machine from [Releases](https://github.com/TurboJeff/chip/releases), or see [Building](#building).
 3. Run it on the machine with the model server:
 
    ```sh
@@ -362,6 +362,18 @@ The Chips page in the dashboard shows each chip's status:
 | Offline | Not connected. Check the chip's log. |
 | Disabled | Turned off in the dashboard. The token is refused until the chip is enabled again. |
 
+## Installing
+
+[Releases](https://github.com/TurboJeff/chip/releases) has archives for macOS (Apple Silicon and Intel) and Linux (x86-64 and ARM64), with a `SHA256SUMS` file. GitHub Actions builds them from the release tag using `make release`.
+
+```sh
+sha256sum -c SHA256SUMS --ignore-missing    # on macOS: shasum -a 256 -c SHA256SUMS --ignore-missing
+tar -xzf chip_v0.1.0_linux_amd64.tar.gz
+sudo install chip_v0.1.0_linux_amd64/chip /usr/local/bin/chip
+```
+
+The macOS binaries aren't signed by Apple. If you downloaded the archive with a browser, run `xattr -d com.apple.quarantine /usr/local/bin/chip` before the first run. Archives downloaded with `curl` aren't affected.
+
 ## Building
 
 Building requires Go 1.26. `go.mod` sets the toolchain to go1.26.9, which has fixes for known `net/http` vulnerabilities, and the `go` command downloads it if your installed version is older. Binaries are built with CGO disabled, so they're statically linked.
@@ -370,6 +382,7 @@ Building requires Go 1.26. `go.mod` sets the toolchain to go1.26.9, which has fi
 make build    # ./bin/chip for this machine
 make test     # run the tests
 make dist     # cross-compile into ./dist
+make release  # release archives and SHA256SUMS for macOS and Linux
 ```
 
 `make dist` builds:
