@@ -1,6 +1,6 @@
 <div align="center">
 
-<img src=".github/banner.svg" alt="chipin chip" width="820">
+<img src=".github/banner.svg" alt="CHIPIN: CHIP" width="820">
 
 **Share the model server on your machine with the people who need it.**<br>
 No open ports. No exposed address. Your keys stay on your machine.
