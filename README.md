@@ -361,7 +361,7 @@ The Chips page in the dashboard shows each chip's status:
 
 ## Building
 
-Building requires Go 1.26. Binaries are built with CGO disabled, so they're statically linked.
+Building requires Go 1.26. `go.mod` sets the toolchain to go1.26.9, which has fixes for known `net/http` vulnerabilities, and the `go` command downloads it if your installed version is older. Binaries are built with CGO disabled, so they're statically linked.
 
 ```sh
 make build    # ./bin/chip for this machine
