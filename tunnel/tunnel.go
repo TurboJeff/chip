@@ -1,3 +1,6 @@
+// Copyright 2026 Jeff Webb
+// SPDX-License-Identifier: Apache-2.0
+
 // Package tunnel carries multiplexed HTTP between a chip and the chipin server.
 //
 // The chip always dials out (so it works behind NAT with no open ports) over a

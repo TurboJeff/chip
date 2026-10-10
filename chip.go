@@ -1,3 +1,6 @@
+// Copyright 2026 Jeff Webb
+// SPDX-License-Identifier: Apache-2.0
+
 // Package chip is the chipin chip: the agent that shares local resources with
 // a chipin server.
 package chip

@@ -1,3 +1,6 @@
+// Copyright 2026 Jeff Webb
+// SPDX-License-Identifier: Apache-2.0
+
 // Package proto holds the types and paths shared by the chipin server and chips.
 package proto
 

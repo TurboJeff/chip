@@ -6,6 +6,7 @@
 
 ![Go 1.26](https://img.shields.io/badge/go-1.26-00ADD8?logo=go&logoColor=white)
 ![Platforms](https://img.shields.io/badge/platforms-macOS%20·%20Linux%20·%20Windows-555)
+![License: Apache-2.0](https://img.shields.io/badge/license-Apache--2.0-blue)
 
 </div>
 
@@ -389,3 +390,11 @@ proto/       paths and types shared with the hub
 ```
 
 The `tunnel` and `proto` packages contain the protocol between the chip and the hub.
+
+## License
+
+Copyright 2026 Jeff Webb. Licensed under the [Apache License, Version 2.0](LICENSE).
+
+If you redistribute the chip or a modified version of it, include the [LICENSE](LICENSE) and [NOTICE](NOTICE) files. The license doesn't grant rights to the chipin name or logo.
+
+Binaries also include third-party software: yamux (MPL-2.0), coder/websocket (ISC) and the Go standard library (BSD-3-Clause). Their licenses are in [THIRD_PARTY_NOTICES](THIRD_PARTY_NOTICES).

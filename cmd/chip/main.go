@@ -1,3 +1,6 @@
+// Copyright 2026 Jeff Webb
+// SPDX-License-Identifier: Apache-2.0
+
 // Command chip is the chipin chip. It shares local resources (today:
 // OpenAI-compatible AI APIs) with a chipin server over an outbound tunnel.
 //
