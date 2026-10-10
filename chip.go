@@ -155,6 +155,11 @@ func (a *Agent) handleResource(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	if apiPath == "/v1/models" && res.allowed != nil {
+		res.serveModels(w, r)
+		return
+	}
+
 	// Take a slot before reading the body, so the hub can't make the chip
 	// buffer a body for every stream it opens.
 	if res.sem != nil {
@@ -191,6 +196,35 @@ func (a *Agent) handleResource(w http.ResponseWriter, r *http.Request) {
 
 	r.URL.Path = apiPath
 	res.proxy.ServeHTTP(w, r)
+}
+
+// serveModels answers GET /v1/models with only the models the owner shares.
+func (r *resource) serveModels(w http.ResponseWriter, req *http.Request) {
+	up, _ := http.NewRequestWithContext(req.Context(), http.MethodGet, r.upstream.String()+"/models", nil)
+	if r.APIKey != "" {
+		up.Header.Set("Authorization", "Bearer "+r.APIKey)
+	}
+	resp, err := r.client.Do(up)
+	if err != nil {
+		writeError(w, http.StatusBadGateway, "upstream_error", "the shared resource did not respond")
+		return
+	}
+	defer resp.Body.Close()
+	var list struct {
+		Data []map[string]json.RawMessage `json:"data"`
+	}
+	if resp.StatusCode != http.StatusOK || json.NewDecoder(io.LimitReader(resp.Body, 4<<20)).Decode(&list) != nil {
+		writeError(w, http.StatusBadGateway, "upstream_error", "the shared resource returned a bad model list")
+		return
+	}
+	shared := []map[string]json.RawMessage{}
+	for _, m := range list.Data {
+		var id string
+		if json.Unmarshal(m["id"], &id) == nil && r.allowed[id] {
+			shared = append(shared, m)
+		}
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"object": "list", "data": shared})
 }
 
 // canonicalBody parses a request body and re-encodes it, so the upstream gets

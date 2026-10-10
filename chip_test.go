@@ -201,3 +201,24 @@ func TestFullResourceDoesNotReadBody(t *testing.T) {
 		t.Fatal("body was read while the resource was full")
 	}
 }
+
+// GET /v1/models lists only shared models when an allowlist is set (issue #3).
+func TestModelListIsFiltered(t *testing.T) {
+	a, _ := newTestAgent(t, Resource{Models: []string{"m1"}})
+	rec := do(a.Handler(), "GET", "/r/ai/v1/models", "", nil)
+	var list struct {
+		Data []struct{ ID string }
+	}
+	json.Unmarshal(rec.Body.Bytes(), &list)
+	if rec.Code != 200 || len(list.Data) != 1 || list.Data[0].ID != "m1" {
+		t.Fatalf("got %d %s, want only m1", rec.Code, rec.Body)
+	}
+
+	// Without an allowlist the upstream's list passes through.
+	a, _ = newTestAgent(t, Resource{})
+	rec = do(a.Handler(), "GET", "/r/ai/v1/models", "", nil)
+	json.Unmarshal(rec.Body.Bytes(), &list)
+	if len(list.Data) != 2 {
+		t.Fatalf("no allowlist: got %s", rec.Body)
+	}
+}
