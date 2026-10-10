@@ -27,6 +27,9 @@ func (f *fakeUpstream) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	b, _ := io.ReadAll(r.Body)
 	f.bodies = append(f.bodies, string(b))
 	w.Header().Set("Content-Type", "application/json")
+	w.Header().Set("Server", "llama.cpp/b1234")
+	w.Header().Set("Set-Cookie", "session=abc")
+	w.Header().Set("X-Internal-Host", "gpu-box.lan")
 	if strings.HasSuffix(r.URL.Path, "/models") {
 		io.WriteString(w, `{"data":[{"id":"m1"},{"id":"m2"}]}`)
 		return
@@ -241,6 +244,39 @@ func TestServerURLMustBeHTTPS(t *testing.T) {
 		err := (&Config{Server: url, Token: "t", Resources: res}).Validate()
 		if (err == nil) != ok {
 			t.Errorf("%s: err = %v, want ok = %v", url, err, ok)
+		}
+	}
+}
+
+// Only allowlisted headers cross the chip, in both directions (issue #5).
+func TestOnlyAllowlistedHeadersCross(t *testing.T) {
+	a, up := newTestAgent(t, Resource{APIKey: "donor-secret"})
+	rec := do(a.Handler(), "POST", "/r/ai/v1/chat/completions", `{"model":"m1"}`, map[string]string{
+		"Content-Type":        "application/json",
+		"Accept":              "text/event-stream",
+		"Proxy-Authorization": "Basic eA==",
+		"X-Api-Key":           "consumer-key",
+		"X-Real-Ip":           "1.2.3.4",
+		"Cf-Connecting-Ip":    "1.2.3.4",
+		"True-Client-Ip":      "1.2.3.4",
+		"X-Anything":          "x",
+	})
+	h := up.headers[0]
+	if h.Get("Content-Type") != "application/json" || h.Get("Accept") != "text/event-stream" || h.Get("Authorization") != "Bearer donor-secret" {
+		t.Errorf("needed headers missing: %v", h)
+	}
+	for _, k := range []string{"Proxy-Authorization", "X-Api-Key", "X-Real-Ip", "Cf-Connecting-Ip", "True-Client-Ip", "X-Anything"} {
+		if h.Get(k) != "" {
+			t.Errorf("%s reached the upstream", k)
+		}
+	}
+
+	if rec.Header().Get("Content-Type") != "application/json" {
+		t.Errorf("Content-Type missing from response")
+	}
+	for _, k := range []string{"Server", "Set-Cookie", "X-Internal-Host"} {
+		if rec.Header().Get(k) != "" {
+			t.Errorf("%s came back from the upstream", k)
 		}
 	}
 }

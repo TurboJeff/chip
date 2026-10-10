@@ -67,6 +67,10 @@ func New(cfg *Config, log *slog.Logger) (*Agent, error) {
 			Transport:     transport,
 			Rewrite:       r.rewrite,
 			FlushInterval: -1, // stream SSE tokens immediately
+			ModifyResponse: func(resp *http.Response) error {
+				resp.Header = keepHeaders(resp.Header, responseHeaders)
+				return nil
+			},
 			ErrorHandler: func(w http.ResponseWriter, req *http.Request, err error) {
 				if req.Context().Err() == nil {
 					log.Warn("upstream error", "resource", r.Name, "err", err)
@@ -254,21 +258,36 @@ func canonicalBody(body []byte) ([]byte, string, error) {
 	return bytes.TrimSuffix(buf.Bytes(), []byte("\n")), model, nil
 }
 
-// rewrite points a tunnelled request at the upstream and makes sure nothing
-// from the far side (consumer credentials, addresses, cookies) leaks through.
+// rewrite points a tunnelled request at the upstream and forwards only the
+// allowlisted headers, so nothing from the far side (consumer credentials,
+// addresses, cookies) reaches it.
 func (r *resource) rewrite(pr *httputil.ProxyRequest) {
 	target := *r.upstream
 	target.Path = r.upstream.Path + strings.TrimPrefix(pr.In.URL.Path, "/v1")
 	target.RawQuery = ""
 	pr.Out.URL = &target
 	pr.Out.Host = ""
-	h := pr.Out.Header
-	for _, k := range []string{"Authorization", "Cookie", "X-Forwarded-For", "X-Forwarded-Host", "X-Forwarded-Proto", "Forwarded"} {
-		h.Del(k)
-	}
+	pr.Out.Header = keepHeaders(pr.In.Header, requestHeaders)
 	if r.APIKey != "" {
-		h.Set("Authorization", "Bearer "+r.APIKey)
+		pr.Out.Header.Set("Authorization", "Bearer "+r.APIKey)
 	}
+}
+
+// Only these headers cross the chip. Everything else, including credentials,
+// client addresses and server details, is dropped in both directions.
+var (
+	requestHeaders  = []string{"Content-Type", "Accept"}
+	responseHeaders = []string{"Content-Type", "Content-Length", "Cache-Control"}
+)
+
+func keepHeaders(h http.Header, keep []string) http.Header {
+	out := http.Header{}
+	for _, k := range keep {
+		if v := h.Values(k); len(v) > 0 {
+			out[k] = append([]string(nil), v...)
+		}
+	}
+	return out
 }
 
 func (r *resource) status(ctx context.Context) proto.ResourceStatus {

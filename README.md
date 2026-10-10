@@ -134,7 +134,7 @@ CHIP_TOKEN=chip_... chip -server https://hub.chipin.dev -upstream http://127.0.0
 
 ### Upstream key
 
-If your model server requires an API key, for example `llama-server --api-key`, the chip adds it to each request. Before forwarding, the chip removes the `Authorization` header that came from the hub and sets `Authorization: Bearer <your key>`. You can put the key in the config file as `api_key`. To keep it out of the file, use `api_key_env` to name an environment variable that holds it.
+If your model server requires an API key, for example `llama-server --api-key`, the chip adds it to each request. The chip forwards only the `Content-Type` and `Accept` headers from the hub's request, then sets `Authorization: Bearer <your key>`. You can put the key in the config file as `api_key`. To keep it out of the file, use `api_key_env` to name an environment variable that holds it.
 
 ## Configuration
 
@@ -223,7 +223,7 @@ The chip checks each request from the hub before forwarding it. These checks run
 - Requests only go to the upstream URLs in the chip's configuration. The hub chooses a resource by name and can't supply an address.
 - If `models` is set, requests for any other model return 404.
 - If all of a resource's slots are in use, the chip returns 429. The hub normally avoids sending requests to a full chip.
-- The `Authorization`, `Cookie`, `Forwarded`, `X-Forwarded-For`, `X-Forwarded-Host` and `X-Forwarded-Proto` headers are removed.
+- Only the `Content-Type` and `Accept` request headers are forwarded, plus your upstream key if you set one. Responses keep only `Content-Type`, `Content-Length` and `Cache-Control`. Credentials, cookies, client addresses and server details don't pass in either direction.
 - Request bodies larger than 32 MB are rejected.
 - Streamed responses are passed back to the hub as they arrive.
 
