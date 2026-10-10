@@ -17,11 +17,14 @@ import (
 type fakeUpstream struct {
 	paths   []string
 	headers []http.Header
+	bodies  []string
 }
 
 func (f *fakeUpstream) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	f.paths = append(f.paths, r.Method+" "+r.URL.Path)
 	f.headers = append(f.headers, r.Header.Clone())
+	b, _ := io.ReadAll(r.Body)
+	f.bodies = append(f.bodies, string(b))
 	w.Header().Set("Content-Type", "application/json")
 	if strings.HasSuffix(r.URL.Path, "/models") {
 		io.WriteString(w, `{"data":[{"id":"m1"},{"id":"m2"}]}`)
@@ -121,5 +124,37 @@ func TestModelAllowlist(t *testing.T) {
 	json.Unmarshal(rec.Body.Bytes(), &st)
 	if len(st.Resources) != 1 || !st.Resources[0].Healthy || len(st.Resources[0].Models) != 1 || st.Resources[0].Models[0] != "m1" {
 		t.Fatalf("status = %s", rec.Body)
+	}
+}
+
+// Go's decoder matches "MODEL" to the model field, but model servers read the
+// exact key. A body that spells model two ways must not pass the allowlist as
+// one model and run as another (issue #1).
+func TestModelAllowlistCannotBeBypassed(t *testing.T) {
+	a, up := newTestAgent(t, Resource{Models: []string{"m1"}})
+	h := a.Handler()
+	for _, body := range []string{
+		`{"model":"m2","MODEL":"m1"}`,
+		`{"model":"m2","Model":"m1"}`,
+		`{"MODEL":"m1"}`,
+		`{"model":["m1"]}`,
+		`["m1"]`,
+		`null`,
+	} {
+		if rec := do(h, "POST", "/r/ai/v1/chat/completions", body, nil); rec.Code == 200 {
+			t.Errorf("%s: got 200, want it refused", body)
+		}
+	}
+	if len(up.paths) != 0 {
+		t.Fatalf("refused bodies reached upstream: %v", up.bodies)
+	}
+
+	// Exact duplicates collapse to the value the chip checked (the last one),
+	// so the upstream can't pick the other.
+	if rec := do(h, "POST", "/r/ai/v1/chat/completions", `{"model":"m2","model":"m1","prompt":"<a&b>"}`, nil); rec.Code != 200 {
+		t.Fatalf("duplicate model keys: got %d %s", rec.Code, rec.Body)
+	}
+	if got, want := up.bodies[0], `{"model":"m1","prompt":"<a&b>"}`; got != want {
+		t.Fatalf("upstream body = %s, want %s", got, want)
 	}
 }

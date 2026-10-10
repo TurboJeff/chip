@@ -161,15 +161,14 @@ func (a *Agent) handleResource(w http.ResponseWriter, r *http.Request) {
 			writeError(w, http.StatusRequestEntityTooLarge, "invalid_request", "request body too large")
 			return
 		}
-		if res.allowed != nil {
-			var peek struct {
-				Model string `json:"model"`
-			}
-			json.Unmarshal(body, &peek)
-			if !res.allowed[peek.Model] {
-				writeError(w, http.StatusNotFound, "model_not_found", "model not shared")
-				return
-			}
+		body, model, err := canonicalBody(body)
+		if err != nil {
+			writeError(w, http.StatusBadRequest, "invalid_request", err.Error())
+			return
+		}
+		if res.allowed != nil && !res.allowed[model] {
+			writeError(w, http.StatusNotFound, "model_not_found", "model not shared")
+			return
 		}
 		r.Body = io.NopCloser(bytes.NewReader(body))
 		r.ContentLength = int64(len(body))
@@ -189,6 +188,36 @@ func (a *Agent) handleResource(w http.ResponseWriter, r *http.Request) {
 
 	r.URL.Path = apiPath
 	res.proxy.ServeHTTP(w, r)
+}
+
+// canonicalBody parses a request body and re-encodes it, so the upstream gets
+// exactly the JSON the chip checked. Go's decoder matches keys
+// case-insensitively and keeps the last duplicate, while model servers read
+// the exact key "model". Re-encoding drops duplicate keys, and any other
+// spelling of "model" is refused.
+func canonicalBody(body []byte) ([]byte, string, error) {
+	var m map[string]json.RawMessage
+	if err := json.Unmarshal(body, &m); err != nil || m == nil {
+		return nil, "", errors.New("request body must be a JSON object")
+	}
+	for k := range m {
+		if k != "model" && strings.EqualFold(k, "model") {
+			return nil, "", fmt.Errorf("unexpected key %q", k)
+		}
+	}
+	var model string
+	if raw, ok := m["model"]; ok {
+		if err := json.Unmarshal(raw, &model); err != nil {
+			return nil, "", errors.New("model must be a string")
+		}
+	}
+	var buf bytes.Buffer
+	enc := json.NewEncoder(&buf)
+	enc.SetEscapeHTML(false)
+	if err := enc.Encode(m); err != nil {
+		return nil, "", err
+	}
+	return bytes.TrimSuffix(buf.Bytes(), []byte("\n")), model, nil
 }
 
 // rewrite points a tunnelled request at the upstream and makes sure nothing
