@@ -58,6 +58,12 @@ func (c *Config) Validate() error {
 	if c.Server == "" {
 		return fmt.Errorf("server is required")
 	}
+	// The token is sent when the chip connects, so it must not cross the
+	// network unencrypted. Plain http is allowed only for a local hub.
+	su, err := url.Parse(c.Server)
+	if err != nil || su.Host == "" || (su.Scheme != "https" && !(su.Scheme == "http" && isLocal(su.Hostname()))) {
+		return fmt.Errorf("server must be an https URL (http is allowed only for localhost)")
+	}
 	if c.Token == "" {
 		return fmt.Errorf("token is required")
 	}

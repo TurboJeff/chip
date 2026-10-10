@@ -41,7 +41,7 @@ func newTestAgent(t *testing.T, res Resource) (*Agent, *fakeUpstream) {
 	t.Cleanup(ts.Close)
 	res.Name = "ai"
 	res.Upstream = ts.URL + "/v1"
-	a, err := New(&Config{Server: "http://x", Token: "t", Resources: []Resource{res}}, slog.New(slog.DiscardHandler))
+	a, err := New(&Config{Server: "http://localhost", Token: "t", Resources: []Resource{res}}, slog.New(slog.DiscardHandler))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -179,7 +179,7 @@ func TestFullResourceDoesNotReadBody(t *testing.T) {
 	}))
 	t.Cleanup(ts.Close)
 	t.Cleanup(func() { close(release) })
-	a, err := New(&Config{Server: "http://x", Token: "t", Resources: []Resource{
+	a, err := New(&Config{Server: "http://localhost", Token: "t", Resources: []Resource{
 		{Name: "ai", Upstream: ts.URL + "/v1", MaxConcurrent: 1},
 	}}, slog.New(slog.DiscardHandler))
 	if err != nil {
@@ -220,5 +220,27 @@ func TestModelListIsFiltered(t *testing.T) {
 	json.Unmarshal(rec.Body.Bytes(), &list)
 	if len(list.Data) != 2 {
 		t.Fatalf("no allowlist: got %s", rec.Body)
+	}
+}
+
+// The token is sent on connect, so plain http is refused unless the hub is
+// local (issue #4).
+func TestServerURLMustBeHTTPS(t *testing.T) {
+	res := []Resource{{Name: "ai", Upstream: "http://127.0.0.1:1/v1"}}
+	for url, ok := range map[string]bool{
+		"https://hub.chipin.dev":  true,
+		"http://localhost:8080":   true,
+		"http://127.0.0.1:8080":   true,
+		"http://[::1]:8080":       true,
+		"http://hub.chipin.dev":   false,
+		"http://10.0.0.5:8080":    false,
+		"ws://hub.chipin.dev":     false,
+		"hub.chipin.dev":          false,
+		"http://localhost.evil.x": false,
+	} {
+		err := (&Config{Server: url, Token: "t", Resources: res}).Validate()
+		if (err == nil) != ok {
+			t.Errorf("%s: err = %v, want ok = %v", url, err, ok)
+		}
 	}
 }

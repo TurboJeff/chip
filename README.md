@@ -120,7 +120,7 @@ Three kinds of credentials are involved:
 
 The hub creates the token when you register the chip. It is `chip_` followed by 32 URL-safe characters (24 random bytes). The hub shows it once and stores only a SHA-256 hash of it.
 
-The chip sends the token in an `Authorization: Bearer` header when it opens the WebSocket, and its version in an `X-Chipin-Chip-Version` header. Use an `https://` server URL so the token is sent over TLS. The chip logs a warning if the server URL uses plain `http` and isn't localhost.
+The chip sends the token in an `Authorization: Bearer` header when it opens the WebSocket, and its version in an `X-Chipin-Chip-Version` header. The server URL must use `https://`, so the token is always sent over TLS. Plain `http://` is accepted only for a hub on localhost, for development.
 
 If the hub answers with 401, the chip logs `chip token rejected by server` and exits instead of retrying. This means the token is wrong, or the chip has been disabled or deleted in the dashboard. A disabled chip's token is refused until you enable the chip again. Deleting a chip revokes its token permanently.
 
@@ -344,7 +344,7 @@ The chip writes its log to stderr in `key=value` format.
 | `disconnected from chipin, reconnecting` | The connection closed, usually because the hub restarted. The chip reconnects automatically. |
 | `cannot reach server, retrying` | The chip can't reach the hub. It keeps trying, with up to a minute between attempts. |
 | `chip token rejected by server` | The token is wrong, or the chip was disabled or deleted. The chip exits. |
-| `server URL is not https` | The token and requests would be sent unencrypted. Use an `https://` URL. |
+| `server must be an https URL` | The server URL uses plain `http` and isn't localhost. Use an `https://` URL. |
 | `upstream error` | The model server didn't respond to a request. Check that it's running. |
 | `env var X is empty` | The variable named in `api_key_env` isn't set in the chip's environment. |
 | `resource name "..." must match ...` | Resource names can only contain letters, digits, `-` and `_`. |

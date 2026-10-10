@@ -82,9 +82,6 @@ func New(cfg *Config, log *slog.Logger) (*Agent, error) {
 
 // Run keeps the tunnel up until ctx is cancelled, reconnecting with backoff.
 func (a *Agent) Run(ctx context.Context) error {
-	if u, err := url.Parse(a.cfg.Server); err == nil && u.Scheme == "http" && !isLocal(u.Hostname()) {
-		a.log.Warn("server URL is not https; traffic to the server is unencrypted", "server", a.cfg.Server)
-	}
 	backoff := time.Second
 	for {
 		sess, err := tunnel.Dial(ctx, a.cfg.Server, a.cfg.Token, proto.Version)
