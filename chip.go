@@ -155,6 +155,18 @@ func (a *Agent) handleResource(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Take a slot before reading the body, so the hub can't make the chip
+	// buffer a body for every stream it opens.
+	if res.sem != nil {
+		select {
+		case res.sem <- struct{}{}:
+			defer func() { <-res.sem }()
+		default:
+			writeError(w, http.StatusTooManyRequests, "busy", "resource is at capacity")
+			return
+		}
+	}
+
 	if r.Method == http.MethodPost {
 		body, err := io.ReadAll(http.MaxBytesReader(w, r.Body, maxBody))
 		if err != nil {
@@ -174,15 +186,6 @@ func (a *Agent) handleResource(w http.ResponseWriter, r *http.Request) {
 		r.ContentLength = int64(len(body))
 	}
 
-	if res.sem != nil {
-		select {
-		case res.sem <- struct{}{}:
-			defer func() { <-res.sem }()
-		default:
-			writeError(w, http.StatusTooManyRequests, "busy", "resource is at capacity")
-			return
-		}
-	}
 	res.inflight.Add(1)
 	defer res.inflight.Add(-1)
 

@@ -10,6 +10,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"strings"
+	"sync/atomic"
 	"testing"
 )
 
@@ -156,5 +157,47 @@ func TestModelAllowlistCannotBeBypassed(t *testing.T) {
 	}
 	if got, want := up.bodies[0], `{"model":"m1","prompt":"<a&b>"}`; got != want {
 		t.Fatalf("upstream body = %s, want %s", got, want)
+	}
+}
+
+// readTracker records whether anything read the request body.
+type readTracker struct{ read atomic.Bool }
+
+func (r *readTracker) Read(p []byte) (int, error) {
+	r.read.Store(true)
+	return 0, io.EOF
+}
+
+// A full resource answers 429 without reading the body, so a hub can't make
+// the chip buffer a body for every stream it opens (issue #2).
+func TestFullResourceDoesNotReadBody(t *testing.T) {
+	release := make(chan struct{})
+	started := make(chan struct{})
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		close(started)
+		<-release
+	}))
+	t.Cleanup(ts.Close)
+	t.Cleanup(func() { close(release) })
+	a, err := New(&Config{Server: "http://x", Token: "t", Resources: []Resource{
+		{Name: "ai", Upstream: ts.URL + "/v1", MaxConcurrent: 1},
+	}}, slog.New(slog.DiscardHandler))
+	if err != nil {
+		t.Fatal(err)
+	}
+	h := a.Handler()
+
+	go do(h, "POST", "/r/ai/v1/chat/completions", `{"model":"m1"}`, nil)
+	<-started
+
+	body := &readTracker{}
+	req := httptest.NewRequest("POST", "/r/ai/v1/chat/completions", body)
+	rec := httptest.NewRecorder()
+	h.ServeHTTP(rec, req)
+	if rec.Code != http.StatusTooManyRequests {
+		t.Fatalf("got %d, want 429", rec.Code)
+	}
+	if body.read.Load() {
+		t.Fatal("body was read while the resource was full")
 	}
 }
