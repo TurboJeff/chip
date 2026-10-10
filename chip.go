@@ -43,6 +43,8 @@ type resource struct {
 	allowed  map[string]bool
 	inflight atomic.Int64
 	client   *http.Client
+	log      *slog.Logger
+	lastErr  atomic.Pointer[string] // last status error logged, to log only changes
 }
 
 func New(cfg *Config, log *slog.Logger) (*Agent, error) {
@@ -53,7 +55,7 @@ func New(cfg *Config, log *slog.Logger) (*Agent, error) {
 	for _, rc := range cfg.Resources {
 		u, _ := url.Parse(strings.TrimRight(rc.Upstream, "/"))
 		transport := upstreamTransport()
-		r := &resource{Resource: rc, upstream: u, client: &http.Client{Timeout: 5 * time.Second, Transport: transport}}
+		r := &resource{Resource: rc, upstream: u, client: &http.Client{Timeout: 5 * time.Second, Transport: transport}, log: log}
 		if rc.MaxConcurrent > 0 {
 			r.sem = make(chan struct{}, rc.MaxConcurrent)
 		}
@@ -290,8 +292,34 @@ func keepHeaders(h http.Header, keep []string) http.Header {
 	return out
 }
 
+// status reports the resource's health to the hub. Errors sent to the hub are
+// short and generic. The full error, which can include local addresses and
+// ports, is only logged here, once each time it changes.
 func (r *resource) status(ctx context.Context) proto.ResourceStatus {
-	st := proto.ResourceStatus{Name: r.Name, Kind: r.Kind, MaxConcurrent: r.MaxConcurrent, InFlight: r.inflight.Load(), Models: []string{}}
+	st := r.checkStatus(ctx)
+	last := ""
+	if p := r.lastErr.Load(); p != nil {
+		last = *p
+	}
+	if st.detail != last {
+		r.lastErr.Store(&st.detail)
+		if st.detail != "" {
+			r.log.Warn("upstream unhealthy", "resource", r.Name, "err", st.detail)
+		} else if last != "" {
+			r.log.Info("upstream healthy again", "resource", r.Name)
+		}
+	}
+	return st.ResourceStatus
+}
+
+type checkedStatus struct {
+	proto.ResourceStatus
+	detail string // full error for the local log
+}
+
+func (r *resource) checkStatus(ctx context.Context) (out checkedStatus) {
+	st := &out.ResourceStatus
+	*st = proto.ResourceStatus{Name: r.Name, Kind: r.Kind, MaxConcurrent: r.MaxConcurrent, InFlight: r.inflight.Load(), Models: []string{}}
 	req, _ := http.NewRequestWithContext(ctx, http.MethodGet, r.upstream.String()+"/models", nil)
 	if r.APIKey != "" {
 		req.Header.Set("Authorization", "Bearer "+r.APIKey)
@@ -300,13 +328,14 @@ func (r *resource) status(ctx context.Context) proto.ResourceStatus {
 	resp, err := r.client.Do(req)
 	st.LatencyMS = time.Since(start).Milliseconds()
 	if err != nil {
-		st.Error = "upstream unreachable: " + err.Error()
-		return st
+		st.Error, out.detail = "upstream unreachable", err.Error()
+		return
 	}
 	defer resp.Body.Close()
 	if resp.StatusCode != http.StatusOK {
-		st.Error = fmt.Sprintf("upstream returned %s", resp.Status)
-		return st
+		st.Error = fmt.Sprintf("upstream returned %d", resp.StatusCode)
+		out.detail = st.Error
+		return
 	}
 	var list struct {
 		Data []struct {
@@ -314,8 +343,8 @@ func (r *resource) status(ctx context.Context) proto.ResourceStatus {
 		} `json:"data"`
 	}
 	if err := json.NewDecoder(io.LimitReader(resp.Body, 4<<20)).Decode(&list); err != nil {
-		st.Error = "bad /models response: " + err.Error()
-		return st
+		st.Error, out.detail = "upstream returned a bad model list", err.Error()
+		return
 	}
 	for _, m := range list.Data {
 		if r.allowed == nil || r.allowed[m.ID] {
@@ -324,7 +353,7 @@ func (r *resource) status(ctx context.Context) proto.ResourceStatus {
 	}
 	st.Healthy = true
 	st.Loaded, st.LoadedKnown = r.loadedModels(ctx)
-	return st
+	return
 }
 
 // loadedModels asks an Ollama upstream which models are in memory. Other

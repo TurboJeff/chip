@@ -306,3 +306,21 @@ func TestUpstreamThatNeverAnswersTimesOut(t *testing.T) {
 		t.Fatalf("slot still held: %d in flight", n)
 	}
 }
+
+// Status errors sent to the hub don't include local addresses or ports
+// (issue #9).
+func TestStatusErrorsAreGeneric(t *testing.T) {
+	ts := httptest.NewServer(http.NotFoundHandler())
+	dead := ts.URL
+	ts.Close() // nothing listens here now
+	a, err := New(&Config{Server: "http://localhost", Token: "t", Resources: []Resource{
+		{Name: "ai", Upstream: dead + "/v1"},
+	}}, slog.New(slog.DiscardHandler))
+	if err != nil {
+		t.Fatal(err)
+	}
+	rec := do(a.Handler(), "GET", "/_chip/status", "", nil)
+	if strings.Contains(rec.Body.String(), "127.0.0.1") || !strings.Contains(rec.Body.String(), `"error":"upstream unreachable"`) {
+		t.Fatalf("status = %s", rec.Body)
+	}
+}
