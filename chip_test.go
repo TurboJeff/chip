@@ -9,6 +9,9 @@ import (
 	"log/slog"
 	"net/http"
 	"net/http/httptest"
+	"os"
+	"path/filepath"
+	"runtime"
 	"strings"
 	"sync/atomic"
 	"testing"
@@ -322,5 +325,31 @@ func TestStatusErrorsAreGeneric(t *testing.T) {
 	rec := do(a.Handler(), "GET", "/_chip/status", "", nil)
 	if strings.Contains(rec.Body.String(), "127.0.0.1") || !strings.Contains(rec.Body.String(), `"error":"upstream unreachable"`) {
 		t.Fatalf("status = %s", rec.Body)
+	}
+}
+
+// A config file holding the token gets a warning when others can read it
+// (issue #10).
+func TestPermissionWarning(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("mode bits aren't checked on Windows")
+	}
+	path := filepath.Join(t.TempDir(), "chip.json")
+	os.WriteFile(path, []byte(`{}`), 0o600)
+	withToken := &Config{Token: "chip_x"}
+	for _, c := range []struct {
+		mode  os.FileMode
+		cfg   *Config
+		warns bool
+	}{
+		{0o600, withToken, false},
+		{0o640, withToken, true},
+		{0o644, withToken, true},
+		{0o644, &Config{}, false},
+	} {
+		os.Chmod(path, c.mode)
+		if got := PermissionWarning(path, c.cfg) != ""; got != c.warns {
+			t.Errorf("mode %o, token %q: warned = %v", c.mode, c.cfg.Token, got)
+		}
 	}
 }

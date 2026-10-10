@@ -9,6 +9,7 @@ import (
 	"net/url"
 	"os"
 	"regexp"
+	"runtime"
 
 	"github.com/TurboJeff/chip/proto"
 )
@@ -52,6 +53,20 @@ func LoadConfig(path string) (*Config, error) {
 		return nil, fmt.Errorf("%s: %w", path, err)
 	}
 	return &c, nil
+}
+
+// PermissionWarning returns a warning if the config file at path holds a
+// token and other users on the machine can read it. Windows permissions don't
+// map to these mode bits, so it's not checked there.
+func PermissionWarning(path string, c *Config) string {
+	if c.Token == "" || runtime.GOOS == "windows" {
+		return ""
+	}
+	fi, err := os.Stat(path)
+	if err != nil || fi.Mode().Perm()&0o077 == 0 {
+		return ""
+	}
+	return fmt.Sprintf("%s contains the chip token and other users can read it; run chmod 600 %s", path, path)
 }
 
 func (c *Config) Validate() error {

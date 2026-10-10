@@ -50,6 +50,9 @@ func main() {
 		if err != nil {
 			fatal(log, err)
 		}
+		if w := chip.PermissionWarning(*configPath, c); w != "" {
+			log.Warn(w)
+		}
 		cfg = c
 	}
 	if *server != "" {

@@ -187,6 +187,8 @@ Use a config file to share more than one model server or to limit which models a
 chip -config chip.json
 ```
 
+If the file holds the token, make it readable only by you with `chmod 600 chip.json`. On macOS and Linux the chip logs a warning if other users can read it.
+
 | Field | Required | Default | Description |
 |---|---|---|---|
 | `server` | Yes | | Hub URL. |
@@ -347,6 +349,7 @@ The chip writes its log to stderr in `key=value` format.
 | `server must be an https URL` | The server URL uses plain `http` and isn't localhost. Use an `https://` URL. |
 | `upstream error` | The model server didn't respond to a request. Check that it's running. |
 | `env var X is empty` | The variable named in `api_key_env` isn't set in the chip's environment. |
+| `... contains the chip token and other users can read it` | The config file holds the token and its permissions let other users read it. Run `chmod 600` on it. |
 | `resource name "..." must match ...` | Resource names can only contain letters, digits, `-` and `_`. |
 
 The Chips page in the dashboard shows each chip's status:
