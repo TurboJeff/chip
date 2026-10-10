@@ -1,13 +1,6 @@
 <div align="center">
 
-<pre>
- ██████╗██╗  ██╗██╗██████╗
-██╔════╝██║  ██║██║██╔══██╗
-██║     ███████║██║██████╔╝
-██║     ██╔══██║██║██╔═══╝
-╚██████╗██║  ██║██║██║
- ╚═════╝╚═╝  ╚═╝╚═╝╚═╝
-</pre>
+<img src=".github/banner.svg" alt="chip" width="640">
 
 **Share the model server on your machine with the people who need it.**<br>
 No open ports. No exposed address. Your keys stay on your machine.
